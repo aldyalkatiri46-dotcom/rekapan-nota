@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Rekapan Perbaikan Unit v3.0 (Multi-Barang)</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #18bc9c;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-color: #ecf0f1;
+            --info-color: #3498db;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f6fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h2, h3 { color: var(--primary-color); text-align: center; margin-bottom: 5px; }
+        .sub-title { text-align: center; color: #7f8c8d; margin-bottom: 20px; font-size: 14px;}
+
+        form {
+            background: var(--light-color);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .grid-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 5px; font-size: 13px; color: var(--primary-color); }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+
+        /* Gaya Area Dinamis Barang */
+        .sparepart-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        
+        .input-barang-row {
+            display: grid;
+            grid-template-columns: 2fr 3fr 1fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .btn-action-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-submit { background-color: var(--secondary-color); color: white; }
+        .btn-submit:hover { background-color: #128f76; }
+        .btn-export { background-color: var(--info-color); color: white; }
+        .btn-danger { background-color: var(--danger-color); color: white; }
+        .btn-warning { background-color: var(--warning-color); color: white; }
+        .btn-add-item { background-color: #9b59b6; color: white; padding: 6px 12px; font-size: 13px; }
+        .btn-small { padding: 5px 10px; font-size: 12px; }
+
+        .table-responsive { overflow-x: auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+        th { background-color: var(--primary-color); color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            display: inline-block;
+        }
+        .status-selesai { background-color: #2ecc71; }
+        .status-pending { background-color: #f1c40f; color: #333; }
+
+        .item-list-render {
+            margin: 0;
+            padding-left: 15px;
+        }
+
+        .backup-zone {
+            background: #f1f2f6;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>SISTEM REKAPAN PERBAIKAN UNIT & SPAREPART</h2>
+    <div class="sub-title">Versi 3.0 - Fitur Input Lebih dari 1 Barang (Multi-Item) per Nota</div>
+    <hr>
+
+    <form id="notaForm">
+        <div class="grid-form">
+            <div class="form-group">
+                <label for="noUnit">No. Unit</label>
+                <input type="text" id="noUnit" required placeholder="Contoh: DT-88">
+            </div>
+            <div class="form-group">
+                <label for="kodePerbaikan">Kode Perbaikan</label>
+                <input type="text" id="kodePerbaikan" required placeholder="Contoh: REPAIR-01">
+            </div>
+            <div class="form-group">
+                <label for="jarakPerbaikan">Jarak Perbaikan (KM/HM)</label>
+                <input type="number" id="jarakPerbaikan" required placeholder="Contoh: 45000">
+            </div>
+            <div class="form-group">
+                <label for="namaChina">Nama China (中文名)</label>
+                <input type="text" id="namaChina" placeholder="Nama Mandarin (opsional)">
+            </div>
+            <div class="form-group">
+                <label for="waktuMulai">Waktu Mulai Perbaikan</label>
+                <input type="datetime-local" id="waktuMulai" required>
+            </div>
+            <div class="form-group">
+                <label for="waktuSelesai">Waktu Selesai Perbaikan</label>
+                <input type="datetime-local" id="waktuSelesai" required>
+            </div>
+            <div class="form-group">
+                <label for="statusPerbaikan">Status Unit</label>
+                <select id="statusPerbaikan">
+                    <option value="Selesai (Ready)">Selesai (Ready)</option>
+                    <option value="Pending (Tunggu Part)">Pending (Tunggu Part)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="sparepart-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <label style="font-size: 14px; font-weight: bold;">🛠️ Detail Barang / Sparepart Yang Diganti:</label>
+                <button type="button" class="btn-add-item" onclick="tambahBarisBarang()">➕ Tambah Baris Barang</button>
+            </div>
+            
+            <div id="barangInputContainer">
+                <div class="input-barang-row">
+                    <input type="text" class="input-kode-barang" required placeholder="Kode Barang (Contoh: FL-09)">
+                    <input type="text" class="input-nama-barang" required placeholder="Nama Barang (Contoh: Filter Oli)">
+                    <input type="number" class="input-qty-barang" required placeholder="Qty" min="1" value="1">
+                    <button type="button" class="btn-danger btn-small" onclick="hapusBarisBarang(this)" style="padding: 8px 12px;">X</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: right; margin-top: 20px;">
+            <button type="submit" class="btn-submit">💾 Simpan Keseluruhan Nota</button>
+        </div>
+    </form>
+
+    <hr>
+
+    <div class="btn-action-container">
+        <div>
+            <input type="text" id="searchInput" onkeyup="cariData()" placeholder="🔍 Cari No Unit / Kode / Barang..." style="width: 250px;">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="exportKeExcel()" class="btn-export">📊 Ekspor Excel (.xls)</button>
+            <button onclick="hapusSemua()" class="btn-danger btn-small">⚠️ Hapus Semua Data</button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table id="notaTable">
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>No. Unit</th>
+                    <th>Kode Perbaikan</th>
+                    <th>Jarak (KM/HM)</th>
+                    <th>Nama China</th>
+                    <th>Waktu Mulai</th>
+                    <th>Waktu Selesai</th>
+                    <th>Durasi (Downtime)</th>
+                    <th>Daftar Barang / Sparepart (Kode - Nama [Qty])</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+    </div>
+
+    <br><hr>
+    <div class="backup-zone">
+        <strong>Zona Backup:</strong>
+        <button onclick="backupData()" class="btn-warning btn-small">⬇️ Backup Data (Unduh JSON)</button>
+        <input type="file" id="importFile" onchange="importData(this)" style="display:none;">
+        <button onclick="document.getElementById('importFile').click()" class="btn-submit btn-small" style="background-color:#9b59b6;">⬆️ Pulihkan Data (Upload JSON)</button>
+    </div>
+</div>
+
+<script>
+    // Menggunakan nama storage baru agar tidak bentrok dengan versi sebelumnya
+    let dataNota = JSON.parse(localStorage.getItem('dataNotaVersi3')) || [];
+    const form = document.getElementById('notaForm');
+    const tableBody = document.getElementById('tableBody');
+    const barangInputContainer = document.getElementById('barangInputContainer');
+
+    // Fungsi menambah baris input barang baru secara dinamis
+    function tambahBarisBarang() {
+        const rowBaru = document.createElement('div');
+        rowBaru.className = 'input-barang-row';
+        rowBaru.innerHTML = `
+            <input type="text" class="input-kode-barang" required placeholder="Kode Barang">
+            <input type="text" class="input-nama-barang" required placeholder="Nama Barang">
+            <input type="number" class="input-qty-barang" required placeholder="Qty" min="1" value="1">
+            <button type="button" class="btn-danger btn-small" onclick="hapusBarisBarang(this)" style="padding: 8px 12px;">X</button>
+        `;
+        barangInputContainer.appendChild(rowBaru);
+    }
+
+    // Fungsi menghapus baris input barang tertentu
+    function hapusBarisBarang(btn) {
+        const rows = barangInputContainer.getElementsByClassName('input-barang-row');
+        if (rows.length > 1) {
+            btn.parentElement.remove();
+        } else {
+            alert("Minimal harus ada 1 barang dalam satu nota perbaikan!");
+        }
+    }
+
+    // Fungsi menghitung downtime otomatis
+    function hitungDurasi(mulai, selesai) {
+        const diffMs = new Date(selesai) - new Date(mulai); // typo handling aman karena diganti manual di bawah
+        const diff = new Date(selesai) - new Date(mulai);
+        if (diff < 0 || isNaN(diff)) return "Waktu Salah";
+        
+        const diffHrs = Math.floor(diff / (1000 * 60 * 60));
+        const diffMins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        
+        return `${diffHrs} Jam ${diffMins} Menit`;
+    }
+
+    function formatTgl(dateTimeStr) {
+        if(!dateTimeStr) return "-";
+        const opsi = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit' };
+        return new Date(dateTimeStr).toLocaleDateString('id-ID', opsi).replace(',', '');
+    }
+
+    // Menampilkan data ke tabel utama
+    function tampilkanData() {
+        tableBody.innerHTML = '';
+        dataNota.forEach((item, index) => {
+            const durasi = hitungDurasi(item.waktuMulai, item.waktuSelesai);
+            const badgeClass = item.statusPerbaikan.includes('Selesai') ? 'status-selesai' : 'status-pending';
+            
+            // Generate list barang berbentuk list HTML peluru (bullet)
+            let listBarangHtml = '<ul class="item-list-render">';
+            item.listBarang.forEach(brg => {
+                listBarangHtml += `<li><code>${brg.kode}</code> - ${brg.nama} <b>[${brg.qty}x]</b></li>`;
+            });
+            listBarangHtml += '</ul>';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td><b>${item.noUnit}</b></td>
+                <td>${item.kodePerbaikan}</td>
+                <td>${item.jarakPerbaikan}</td>
+                <td>${item.namaChina || '-'}</td>
+                <td>${formatTgl(item.waktuMulai)}</td>
+                <td>${formatTgl(item.waktuSelesai)}</td>
+                <td><i style="color:#e67e22; font-weight:bold;">${durasi}</i></td>
+                <td>${listBarangHtml}</td>
+                <td><span class="status-badge ${badgeClass}">${item.statusPerbaikan}</span></td>
+                <td><button class="btn-danger btn-small" onclick="hapusData(${index})">Hapus</button></td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    // Submit Form (Koleksi data utama + array data barang)
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Ambil semua data barang dari baris input dinamis
+        const arrayBarang = [];
+        const rows = barangInputContainer.getElementsByClassName('input-barang-row');
+        
+        for (let i = 0; i < rows.length; i++) {
+            const kode = rows[i].querySelector('.input-kode-barang').value;
+            const nama = rows[i].querySelector('.input-nama-barang').value;
+            const qty = rows[i].querySelector('.input-qty-barang').value;
+            
+            arrayBarang.push({ kode, nama, qty });
+        }
+
+        const notaBaru = {
+            noUnit: document.getElementById('noUnit').value,
+            kodePerbaikan: document.getElementById('kodePerbaikan').value,
+            jarakPerbaikan: document.getElementById('jarakPerbaikan').value,
+            namaChina: document.getElementById('namaChina').value,
+            waktuMulai: document.getElementById('waktuMulai').value,
+            waktuSelesai: document.getElementById('waktuSelesai').value,
+            statusPerbaikan: document.getElementById('statusPerbaikan').value,
+            listBarang: arrayBarang // Menyimpan banyak barang dalam bentuk array
+        };
+
+        dataNota.push(notaBaru);
+        localStorage.setItem('dataNotaVersi3', JSON.stringify(dataNota));
+        tampilkanData();
+        
+        // Reset form & kembalikan baris input barang ke default (1 baris kosong)
+        form.reset();
+        barangInputContainer.innerHTML = `
+            <div class="input-barang-row">
+                <input type="text" class="input-kode-barang" required placeholder="Kode Barang (Contoh: FL-09)">
+                <input type="text" class="input-nama-barang" required placeholder="Nama Barang (Contoh: Filter Oli)">
+                <input type="number" class="input-qty-barang" required placeholder="Qty" min="1" value="1">
+                <button type="button" class="btn-danger btn-small" onclick="hapusBarisBarang(this)" style="padding: 8px 12px;">X</button>
+            </div>
+        `;
+    });
+
+    function hapusData(index) {
+        if(confirm("Hapus baris data nota ini?")) {
+            dataNota.splice(index, 1);
+            localStorage.setItem('dataNotaVersi3', JSON.stringify(dataNota));
+            tampilkanData();
+        }
+    }
+
+    function hapusSemua() {
+        if(confirm("⚠️ PERINGATAN! Seluruh data rekapan nota akan dikosongkan. Lanjutkan?")) {
+            dataNota = [];
+            localStorage.removeItem('dataNotaVersi3');
+            tampilkanData();
+        }
+    }
+
+    function cariData() {
+        const input = document.getElementById('searchInput').value.toLowerCase();
+        const rows = tableBody.getElementsByTagName('tr');
+        for (let i = 0; i < rows.length; i++) {
+            let ketemu = false;
+            const cells = rows[i].getElementsByTagName('td');
+            for (let j = 1; j < cells.length - 1; j++) {
+                if (cells[j] && cells[j].innerText.toLowerCase().includes(input)) {
+                    ketemu = true;
+                    break;
+                }
+            }
+            rows[i].style.display = ketemu ? "" : "none";
+        }
+    }
+
+    function exportKeExcel() {
+        let html = document.getElementById('notaTable').outerHTML;
+        // Bersihkan kolom aksi tombol hapus agar di excel bersih
+        html = html.replace(/<th>Aksi<\/th>/g, '').replace(/<td><button.*?<\/button><\/td>/g, '');
+        
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Rekapan_Nota_MultiBarang_${new Date().toISOString().slice(0,10)}.xls`;
+        a.click();
+    }
+
+    // Backup JSON
+    function backupData() {
+        if (dataNota.length === 0) return alert("Tidak ada data untuk di-backup!");
+        const blob = new Blob([JSON.stringify(dataNota, null, 2)], { type: "application/json" });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `BACKUP_V3_REKAPAN_NOTA_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    // Import JSON
+    function importData(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (Array.isArray(importedData)) {
+                    dataNota = importedData;
+                    localStorage.setItem('dataNotaVersi3', JSON.stringify(dataNota));
+                    tampilkanData();
+                    alert("✅ Data multi-barang berhasil dipulihkan!");
+                } else { alert("Format file cadangan salah!"); }
+            } catch (err) { alert("Gagal memproses file cadangan."); }
+        };
+        reader.readAsText(file);
+    }
+
+    // Load data pertama kali halaman dibuka
+    tampilkanData();
+</script>
+</body>
+</html>
