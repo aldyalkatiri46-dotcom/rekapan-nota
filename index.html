@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Rekapan Perbaikan Unit NOTA GUDANG </title>
+    <title>Sistem Rekapan Perbaikan Unit NOTA GUDANG</title>
+    <!-- Library SheetJS untuk membaca File Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -12,6 +14,7 @@
             --warning-color: #f39c12;
             --light-color: #ecf0f1;
             --info-color: #3498db;
+            --purple-color: #9b59b6;
         }
 
         body {
@@ -33,6 +36,20 @@
         h2, h3 { color: var(--primary-color); text-align: center; margin-bottom: 5px; }
         .sub-title { text-align: center; color: #7f8c8d; margin-bottom: 20px; font-size: 14px;}
 
+        .excel-zone {
+            background: #ebf5fb;
+            border: 2px dashed var(--info-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .excel-status { font-weight: bold; color: var(--danger-color); }
+
         form {
             background: var(--light-color);
             padding: 20px;
@@ -47,11 +64,10 @@
             margin-bottom: 15px;
         }
 
-        .form-group { display: flex; flex-direction: column; }
+        .form-group { display: flex; flex-direction: column; position: relative; }
         label { font-weight: bold; margin-bottom: 5px; font-size: 13px; color: var(--primary-color); }
         input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
 
-        /* Gaya Area Dinamis Barang */
         .sparepart-section {
             margin-top: 20px;
             padding: 15px;
@@ -64,8 +80,32 @@
             display: grid;
             grid-template-columns: 2fr 3fr 1fr auto;
             gap: 10px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             align-items: center;
+            position: relative;
+        }
+
+        .autocomplete-suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 150px;
+            overflow-y: auto;
+            box-shadow: 0 4px 5px rgba(0,0,0,0.15);
+            border-radius: 0 0 4px 4px;
+        }
+        .autocomplete-suggestion {
+            padding: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .autocomplete-suggestion:hover {
+            background-color: #e9e9e9;
         }
 
         .btn-action-container {
@@ -83,7 +123,7 @@
         .btn-export { background-color: var(--info-color); color: white; }
         .btn-danger { background-color: var(--danger-color); color: white; }
         .btn-warning { background-color: var(--warning-color); color: white; }
-        .btn-add-item { background-color: #9b59b6; color: white; padding: 6px 12px; font-size: 13px; }
+        .btn-add-item { background-color: var(--purple-color); color: white; padding: 6px 12px; font-size: 13px; }
         .btn-small { padding: 5px 10px; font-size: 12px; }
 
         .table-responsive { overflow-x: auto; margin-top: 15px; }
@@ -103,11 +143,7 @@
         .status-selesai { background-color: #2ecc71; }
         .status-pending { background-color: #f1c40f; color: #333; }
 
-        .item-list-render {
-            margin: 0;
-            padding-left: 15px;
-        }
-
+        .item-list-render { margin: 0; padding-left: 15px; }
         .backup-zone {
             background: #f1f2f6;
             padding: 10px;
@@ -123,22 +159,33 @@
 
 <div class="container">
     <h2>SISTEM REKAPAN PERBAIKAN UNIT NOTA GUDANG</h2>
-    <div class="sub-title"> KM36</div>
+    <div class="sub-title">KM36 - Connected to Excel Database</div>
     <hr>
+
+    <!-- ZONA KONEKSI EXCEL DATA BARANG -->
+    <div class="excel-zone">
+        <div>
+            <label style="font-size: 14px; display: block; margin-bottom: 5px;">🔌 <b>Koneksikan Master Data Barang (Excel):</b></label>
+            <input type="file" id="excelFile" accept=".xlsx, .xls" onchange="bacaExcelDataBarang(this)">
+        </div>
+        <div class="excel-status" id="excelStatus">
+            ❌ Excel Belum Terhubung (Nama barang harus diketik manual)
+        </div>
+    </div>
 
     <form id="notaForm">
         <div class="grid-form">
             <div class="form-group">
                 <label for="noUnit">No. Unit</label>
-                <input type="text" id="noUnit" required placeholder="">
+                <input type="text" id="noUnit" required>
             </div>
             <div class="form-group">
                 <label for="kodePerbaikan">Kode Perbaikan</label>
-                <input type="text" id="kodePerbaikan" required placeholder="">
+                <input type="text" id="kodePerbaikan" required>
             </div>
             <div class="form-group">
                 <label for="jarakPerbaikan">Jarak Perbaikan (KM/HM)</label>
-                <input type="number" id="jarakPerbaikan" required placeholder="">
+                <input type="number" id="jarakPerbaikan" required>
             </div>
             <div class="form-group">
                 <label for="namaChina">Nama China (中文名)</label>
@@ -169,8 +216,11 @@
             
             <div id="barangInputContainer">
                 <div class="input-barang-row">
-                    <input type="text" class="input-kode-barang" required placeholder="Kode Barang (Contoh: FL-09)">
-                    <input type="text" class="input-nama-barang" required placeholder="Nama Barang (Contoh: Filter Oli)">
+                    <div style="position: relative; display: flex; flex-direction: column;">
+                        <input type="text" class="input-kode-barang" required placeholder="Ketik/Pilih Kode..." oninput="cariOtomatisBarang(this)" autocomplete="off">
+                        <div class="autocomplete-suggestions" style="display: none;"></div>
+                    </div>
+                    <input type="text" class="input-nama-barang" required placeholder="Nama Barang">
                     <input type="number" class="input-qty-barang" required placeholder="Qty" min="1" value="1">
                     <button type="button" class="btn-danger btn-small" onclick="hapusBarisBarang(this)" style="padding: 8px 12px;">X</button>
                 </div>
@@ -211,8 +261,7 @@
                     <th>Aksi</th>
                 </tr>
             </thead>
-            <tbody id="tableBody">
-                </tbody>
+            <tbody id="tableBody"></tbody>
         </table>
     </div>
 
@@ -226,18 +275,118 @@
 </div>
 
 <script>
-    // Menggunakan nama storage baru agar tidak bentrok dengan versi sebelumnya
     let dataNota = JSON.parse(localStorage.getItem('dataNotaVersi3')) || [];
+    let masterDataBarang = []; 
+    
     const form = document.getElementById('notaForm');
     const tableBody = document.getElementById('tableBody');
     const barangInputContainer = document.getElementById('barangInputContainer');
 
-    // Fungsi menambah baris input barang baru secara dinamis
+    // Fungsi membaca file Excel
+    function bacaExcelDataBarang(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Mengonversi data Excel menjadi JSON mentah
+                const rawData = XLSX.utils.sheet_to_json(worksheet);
+                
+                // Normalisasi nama key/kolom agar tahan terhadap huruf kapital maupun spasi di Excel
+                masterDataBarang = rawData.map(row => {
+                    let normalizedRow = {};
+                    for (let key in row) {
+                        let cleanKey = key.trim().toLowerCase().replace(/\s+/g, '');
+                        normalizedRow[cleanKey] = row[key];
+                    }
+                    return normalizedRow;
+                });
+                
+                if(masterDataBarang.length > 0) {
+                    const statusStatus = document.getElementById('excelStatus');
+                    statusStatus.innerHTML = `✅ Terhubung! ${masterDataBarang.length} item aktif.`;
+                    statusStatus.style.color = '#2ecc71';
+                } else {
+                    alert("Gagal membaca data. Pastikan isi Excel tidak kosong.");
+                }
+            } catch (err) {
+                alert("Sistem gagal membaca format Excel ini.");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Fungsi mencari & menampilkan dropdown kecocokan barang secara real-time
+    function cariOtomatisBarang(inputElement) {
+        const containerBaris = inputElement.parentElement;
+        const suggestionBox = containerBaris.querySelector('.autocomplete-suggestions');
+        const inputNamaBarang = containerBaris.parentElement.querySelector('.input-nama-barang');
+        const val = inputElement.value.trim().toLowerCase();
+
+        // Bersihkan box rekomendasi lama
+        suggestionBox.innerHTML = '';
+
+        if (!val || masterDataBarang.length === 0) {
+            suggestionBox.style.display = 'none';
+            return;
+        }
+
+        // Cari item berdasarkan Kode atau Nama Barang yang mengandung teks inputan
+        const matches = masterDataBarang.filter(item => {
+            const kode = String(item['kodebarang'] || item['kode'] || '').toLowerCase();
+            const nama = String(item['namabarang'] || item['nama'] || '').toLowerCase();
+            return kode.includes(val) || nama.includes(val);
+        }).slice(0, 5); // Tampilkan maksimal 5 opsi teratas agar tidak menutupi layar
+
+        if (matches.length > 0) {
+            suggestionBox.style.display = 'block';
+            matches.forEach(item => {
+                const kodeReal = item['kodebarang'] || item['kode'] || '';
+                const namaReal = item['namabarang'] || item['nama'] || '';
+                const chinaReal = item['namachina'] || item['china'] || '';
+
+                const div = document.createElement('div');
+                div.className = 'autocomplete-suggestion';
+                div.innerHTML = `<b>${kodeReal}</b> - ${namaReal}`;
+                
+                // Ketika salah satu opsi di-klik
+                div.onclick = function() {
+                    inputElement.value = kodeReal;
+                    inputNamaBarang.value = namaReal;
+                    if(chinaReal && !document.getElementById('namaChina').value) {
+                        document.getElementById('namaChina').value = chinaReal;
+                    }
+                    suggestionBox.style.display = 'none';
+                };
+                suggestionBox.appendChild(div);
+            });
+        } else {
+            suggestionBox.style.display = 'none';
+        }
+    }
+
+    // Menutup popup rekomendasi jika user mengklik di luar area input
+    document.addEventListener('click', function(e) {
+        if (!e.target.classList.contains('input-kode-barang')) {
+            const boxes = document.querySelectorAll('.autocomplete-suggestions');
+            boxes.forEach(box => box.style.display = 'none');
+        }
+    });
+
     function tambahBarisBarang() {
         const rowBaru = document.createElement('div');
         rowBaru.className = 'input-barang-row';
         rowBaru.innerHTML = `
-            <input type="text" class="input-kode-barang" required placeholder="Kode Barang">
+            <div style="position: relative; display: flex; flex-direction: column;">
+                <input type="text" class="input-kode-barang" required placeholder="Ketik/Pilih Kode..." oninput="cariOtomatisBarang(this)" autocomplete="off">
+                <div class="autocomplete-suggestions" style="display: none;"></div>
+            </div>
             <input type="text" class="input-nama-barang" required placeholder="Nama Barang">
             <input type="number" class="input-qty-barang" required placeholder="Qty" min="1" value="1">
             <button type="button" class="btn-danger btn-small" onclick="hapusBarisBarang(this)" style="padding: 8px 12px;">X</button>
@@ -245,7 +394,6 @@
         barangInputContainer.appendChild(rowBaru);
     }
 
-    // Fungsi menghapus baris input barang tertentu
     function hapusBarisBarang(btn) {
         const rows = barangInputContainer.getElementsByClassName('input-barang-row');
         if (rows.length > 1) {
@@ -255,15 +403,11 @@
         }
     }
 
-    // Fungsi menghitung downtime otomatis
     function hitungDurasi(mulai, selesai) {
-        const diffMs = new Date(selesai) - new Date(mulai); // typo handling aman karena diganti manual di bawah
         const diff = new Date(selesai) - new Date(mulai);
         if (diff < 0 || isNaN(diff)) return "Waktu Salah";
-        
         const diffHrs = Math.floor(diff / (1000 * 60 * 60));
         const diffMins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        
         return `${diffHrs} Jam ${diffMins} Menit`;
     }
 
@@ -273,14 +417,12 @@
         return new Date(dateTimeStr).toLocaleDateString('id-ID', opsi).replace(',', '');
     }
 
-    // Menampilkan data ke tabel utama
     function tampilkanData() {
         tableBody.innerHTML = '';
         dataNota.forEach((item, index) => {
             const durasi = hitungDurasi(item.waktuMulai, item.waktuSelesai);
             const badgeClass = item.statusPerbaikan.includes('Selesai') ? 'status-selesai' : 'status-pending';
             
-            // Generate list barang berbentuk list HTML peluru (bullet)
             let listBarangHtml = '<ul class="item-list-render">';
             item.listBarang.forEach(brg => {
                 listBarangHtml += `<li><code>${brg.kode}</code> - ${brg.nama} <b>[${brg.qty}x]</b></li>`;
@@ -305,11 +447,16 @@
         });
     }
 
-    // Submit Form (Koleksi data utama + array data barang)
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // Ambil semua data barang dari baris input dinamis
+        const tglMulai = new Date(document.getElementById('waktuMulai').value);
+        const tglSelesai = new Date(document.getElementById('waktuSelesai').value);
+        if (tglSelesai < tglMulai) {
+            alert("❌ Gagal Menyimpan: Waktu Selesai tidak boleh mendahului Waktu Mulai!");
+            return;
+        }
+
         const arrayBarang = [];
         const rows = barangInputContainer.getElementsByClassName('input-barang-row');
         
@@ -317,7 +464,6 @@
             const kode = rows[i].querySelector('.input-kode-barang').value;
             const nama = rows[i].querySelector('.input-nama-barang').value;
             const qty = rows[i].querySelector('.input-qty-barang').value;
-            
             arrayBarang.push({ kode, nama, qty });
         }
 
@@ -329,19 +475,21 @@
             waktuMulai: document.getElementById('waktuMulai').value,
             waktuSelesai: document.getElementById('waktuSelesai').value,
             statusPerbaikan: document.getElementById('statusPerbaikan').value,
-            listBarang: arrayBarang // Menyimpan banyak barang dalam bentuk array
+            listBarang: arrayBarang
         };
 
         dataNota.push(notaBaru);
         localStorage.setItem('dataNotaVersi3', JSON.stringify(dataNota));
         tampilkanData();
         
-        // Reset form & kembalikan baris input barang ke default (1 baris kosong)
         form.reset();
         barangInputContainer.innerHTML = `
             <div class="input-barang-row">
-                <input type="text" class="input-kode-barang" required placeholder="Kode Barang (Contoh: FL-09)">
-                <input type="text" class="input-nama-barang" required placeholder="Nama Barang (Contoh: Filter Oli)">
+                <div style="position: relative; display: flex; flex-direction: column;">
+                    <input type="text" class="input-kode-barang" required placeholder="Ketik/Pilih Kode..." oninput="cariOtomatisBarang(this)" autocomplete="off">
+                    <div class="autocomplete-suggestions" style="display: none;"></div>
+                </div>
+                <input type="text" class="input-nama-barang" required placeholder="Nama Barang">
                 <input type="number" class="input-qty-barang" required placeholder="Qty" min="1" value="1">
                 <button type="button" class="btn-danger btn-small" onclick="hapusBarisBarang(this)" style="padding: 8px 12px;">X</button>
             </div>
@@ -382,9 +530,7 @@
 
     function exportKeExcel() {
         let html = document.getElementById('notaTable').outerHTML;
-        // Bersihkan kolom aksi tombol hapus agar di excel bersih
         html = html.replace(/<th>Aksi<\/th>/g, '').replace(/<td><button.*?<\/button><\/td>/g, '');
-        
         const blob = new Blob([html], { type: "application/vnd.ms-excel" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -392,7 +538,6 @@
         a.click();
     }
 
-    // Backup JSON
     function backupData() {
         if (dataNota.length === 0) return alert("Tidak ada data untuk di-backup!");
         const blob = new Blob([JSON.stringify(dataNota, null, 2)], { type: "application/json" });
@@ -402,7 +547,6 @@
         a.click();
     }
 
-    // Import JSON
     function importData(input) {
         const file = input.files[0];
         if (!file) return;
@@ -414,14 +558,13 @@
                     dataNota = importedData;
                     localStorage.setItem('dataNotaVersi3', JSON.stringify(dataNota));
                     tampilkanData();
-                    alert("✅ Data multi-barang berhasil dipulihkan!");
-                } else { alert("Format file cadangan salah!"); }
-            } catch (err) { alert("Gagal memproses file cadangan."); }
+                    alert("✅ Data berhasil dipulihkan!");
+                } else { alert("Format file salah!"); }
+            } catch (err) { alert("Gagal memproses file."); }
         };
         reader.readAsText(file);
     }
 
-    // Load data pertama kali halaman dibuka
     tampilkanData();
 </script>
 </body>
